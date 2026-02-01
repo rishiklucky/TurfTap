@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({
   origin: [
     "http://192.168.0.105:3000",
-    "https://your-frontend.onrender.com"
+    "https://turftap.onrender.com"
   ],
   credentials: true
 }));
