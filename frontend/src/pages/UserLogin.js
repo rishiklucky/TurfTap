@@ -89,7 +89,13 @@ export default function UserLogin() {
               </small>
             </div>
 
-            
+            <div className="text-center mt-2">
+              <small>
+                <Link to="/admin-login" className="text-decoration-none">
+                  Login as Admin
+                </Link>
+              </small>
+            </div>
           </div>
         </div>
       </div>
