@@ -45,7 +45,6 @@ export default function MapHome() {
   const [location, setLocation] = useState(null);
   const [manualLocation, setManualLocation] = useState(null);
   const [showManual, setShowManual] = useState(false);
-  const [showAll, setShowAll] = useState(false);
   const [mapZoom, setMapZoom] = useState(14);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -113,24 +112,20 @@ export default function MapHome() {
 
     setLocation(manualLocation);
     setShowManual(false);
-    setShowAll(false);
     setMapZoom(15);
 
     await loadNearbyTurfs(manualLocation[0], manualLocation[1]);
   };
 
-  /* ---------- CHANGE LOCATION ------------ */
+  /* ---------- BUTTON ACTIONS ---------- */
   const changeLocation = () => {
     sessionStorage.removeItem("user_location");
     setShowManual(true);
-    setShowAll(false);
     setManualLocation(null);
     setMapZoom(12);
   };
 
-  /* ---------- SHOW ALL TURFS ---------- */
   const showAllTurfs = async () => {
-    setShowAll(true);
     setShowManual(false);
     setMapZoom(11);
     setLocation(DEFAULT_LOCATION);
@@ -163,55 +158,69 @@ export default function MapHome() {
   }
 
   return (
-    <>
-      {/* ---------- TOP ACTION BAR ---------- */}
+    <div style={{ position: "relative", height: "100vh", width: "100%" }}>
+      
+      {/* ---------- RIGHT FLOATING CONTROLS ---------- */}
       <div
-        className="position-absolute top-0 start-0 w-100 p-2 d-flex gap-2 justify-content-center"
-        style={{ zIndex: 1000 }}
+        className="d-flex flex-column gap-2"
+        style={{
+          position: "absolute",
+          top: "80px",
+          right: "12px",
+          zIndex: 1200
+        }}
       >
         <button
-          className="btn btn-outline-secondary btn-sm"
+          className="btn btn-light btn-sm shadow"
           onClick={changeLocation}
         >
-          Change Location
+          📍 Change Location
         </button>
 
         <button
-          className="btn btn-outline-primary btn-sm"
+          className="btn btn-primary btn-sm shadow"
           onClick={showAllTurfs}
         >
-          Show All Turfs
+          🌍 Show All Turfs
         </button>
       </div>
 
       {/* ---------- MANUAL LOCATION UI ---------- */}
       {showManual && (
-        <div className="container mt-5">
-          <div className="alert alert-warning text-center">
-            We couldn’t get your precise location.
-            <br />
-            Please select your area.
-          </div>
+        <div
+          className="position-absolute top-0 start-0 w-100 p-3"
+          style={{ zIndex: 1200 }}
+        >
+          <div className="card shadow">
+            <div className="card-body text-center">
+              <p className="fw-bold mb-2">
+                We couldn’t get your precise location
+              </p>
 
-          <div className="input-group mb-2">
-            <input
-              className="form-control"
-              placeholder="Search city / area"
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-            />
-            <button className="btn btn-outline-primary" onClick={searchLocation}>
-              Search
-            </button>
-          </div>
+              <div className="input-group mb-2">
+                <input
+                  className="form-control"
+                  placeholder="Search city / area"
+                  value={searchText}
+                  onChange={e => setSearchText(e.target.value)}
+                />
+                <button
+                  className="btn btn-outline-primary"
+                  onClick={searchLocation}
+                >
+                  Search
+                </button>
+              </div>
 
-          <button
-            className="btn btn-success w-100"
-            disabled={!manualLocation}
-            onClick={saveManualLocation}
-          >
-            Use This Location
-          </button>
+              <button
+                className="btn btn-success w-100"
+                disabled={!manualLocation}
+                onClick={saveManualLocation}
+              >
+                Use This Location
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -219,7 +228,7 @@ export default function MapHome() {
       <MapContainer
         center={location}
         zoom={mapZoom}
-        style={{ height: "100vh", width: "100%" }}
+        style={{ height: "100%", width: "100%" }}
       >
         <MapController center={manualLocation || location} zoom={mapZoom} />
 
@@ -267,6 +276,6 @@ export default function MapHome() {
             </Marker>
           ))}
       </MapContainer>
-    </>
+    </div>
   );
 }
