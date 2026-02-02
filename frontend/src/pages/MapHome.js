@@ -1,4 +1,11 @@
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMapEvents,
+  useMap
+} from "react-leaflet";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import "../utils/fixLeafletIcon";
@@ -10,7 +17,7 @@ const DEFAULT_IMAGE =
 
 const DEFAULT_LOCATION = [17.385, 78.4867]; // Hyderabad
 
-/* ---------- MANUAL MAP CLICK PICKER ---------- */
+/* ---------- MAP CLICK PICKER ---------- */
 function LocationPicker({ setManualLocation }) {
   useMapEvents({
     click(e) {
@@ -20,11 +27,26 @@ function LocationPicker({ setManualLocation }) {
   return null;
 }
 
+/* ---------- MAP CONTROLLER ---------- */
+function MapController({ center, zoom }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (center) {
+      map.setView(center, zoom, { animate: true });
+    }
+  }, [center, zoom, map]);
+
+  return null;
+}
+
 export default function MapHome() {
   const [turfs, setTurfs] = useState([]);
   const [location, setLocation] = useState(null);
   const [manualLocation, setManualLocation] = useState(null);
   const [showManual, setShowManual] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [mapZoom, setMapZoom] = useState(14);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -33,6 +55,7 @@ export default function MapHome() {
   /* ---------- AUTO LOCATION ---------- */
   useEffect(() => {
     const saved = sessionStorage.getItem("user_location");
+
     if (saved) {
       const loc = JSON.parse(saved);
       setLocation(loc);
@@ -41,76 +64,45 @@ export default function MapHome() {
       return;
     }
 
-    if (!navigator.geolocation) {
-      enableManual();
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
+    navigator.geolocation?.getCurrentPosition(
+      pos => {
         const { latitude, longitude, accuracy } = pos.coords;
 
-        // ❗ Poor accuracy → manual fallback
         if (accuracy > 1000) {
           enableManual();
           return;
         }
 
         setLocation([latitude, longitude]);
-        await loadNearbyTurfs(latitude, longitude);
+        loadNearbyTurfs(latitude, longitude);
         setLoading(false);
       },
       () => enableManual(),
-      {
-        enableHighAccuracy: true,
-        timeout: 10000
-      }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   }, []);
 
-  /* ---------- ENABLE MANUAL ---------- */
+  /* ---------- LOAD TURFS ---------- */
+  const loadNearbyTurfs = async (lat, lng) => {
+    const res = await axios.get(
+      `${API_BASE_URL}/api/turfs/nearby?lat=${lat}&lng=${lng}`
+    );
+    setTurfs(res.data);
+  };
+
+  const loadAllTurfs = async () => {
+    const res = await axios.get(`${API_BASE_URL}/api/turfs/all`);
+    setTurfs(res.data);
+  };
+
+  /* ---------- MANUAL MODE ---------- */
   const enableManual = () => {
-    setLocation(DEFAULT_LOCATION);
     setShowManual(true);
+    setLocation(DEFAULT_LOCATION);
+    setMapZoom(12);
     setLoading(false);
   };
 
-  /* ---------- FETCH TURFS ---------- */
-  const loadNearbyTurfs = async (lat, lng) => {
-    try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/turfs/nearby?lat=${lat}&lng=${lng}`
-      );
-      setTurfs(res.data);
-    } catch (err) {
-      console.error("Failed to fetch turfs", err);
-    }
-  };
-
-  /* ---------- SEARCH CITY ---------- */
-  const searchLocation = async () => {
-    if (!searchText) return;
-
-    try {
-      const res = await axios.get(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${searchText}`
-      );
-
-      if (!res.data.length) {
-        alert("Location not found");
-        return;
-      }
-
-      setManualLocation([
-        parseFloat(res.data[0].lat),
-        parseFloat(res.data[0].lon)
-      ]);
-    } catch {
-      alert("Search failed");
-    }
-  };
-
-  /* ---------- SAVE MANUAL LOCATION ---------- */
   const saveManualLocation = async () => {
     if (!manualLocation) return;
 
@@ -121,52 +113,100 @@ export default function MapHome() {
 
     setLocation(manualLocation);
     setShowManual(false);
+    setShowAll(false);
+    setMapZoom(15);
+
     await loadNearbyTurfs(manualLocation[0], manualLocation[1]);
+  };
+
+  /* ---------- CHANGE LOCATION ---------- */
+  const changeLocation = () => {
+    sessionStorage.removeItem("user_location");
+    setShowManual(true);
+    setShowAll(false);
+    setManualLocation(null);
+    setMapZoom(12);
+  };
+
+  /* ---------- SHOW ALL TURFS ---------- */
+  const showAllTurfs = async () => {
+    setShowAll(true);
+    setShowManual(false);
+    setMapZoom(11);
+    setLocation(DEFAULT_LOCATION);
+    await loadAllTurfs();
+  };
+
+  /* ---------- SEARCH CITY ---------- */
+  const searchLocation = async () => {
+    if (!searchText) return;
+
+    const res = await axios.get(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${searchText}`
+    );
+
+    if (res.data.length) {
+      setManualLocation([
+        parseFloat(res.data[0].lat),
+        parseFloat(res.data[0].lon)
+      ]);
+    }
   };
 
   /* ---------- LOADING ---------- */
   if (loading) {
     return (
-      <div className="container-fluid vh-100 d-flex align-items-center justify-content-center bg-light">
-        <div className="card shadow-sm p-4 text-center">
-          <div className="spinner-border text-primary mb-3" />
-          <h5>Fetching your location</h5>
-          <p className="text-muted mb-0">
-            Please allow location access
-          </p>
-        </div>
+      <div className="vh-100 d-flex align-items-center justify-content-center">
+        <div className="spinner-border text-primary" />
       </div>
     );
   }
 
   return (
     <>
+      {/* ---------- TOP ACTION BAR ---------- */}
+      <div
+        className="position-absolute top-0 start-0 w-100 p-2 d-flex gap-2 justify-content-center"
+        style={{ zIndex: 1000 }}
+      >
+        <button
+          className="btn btn-outline-secondary btn-sm"
+          onClick={changeLocation}
+        >
+          Change Location
+        </button>
+
+        <button
+          className="btn btn-outline-primary btn-sm"
+          onClick={showAllTurfs}
+        >
+          Show All Turfs
+        </button>
+      </div>
+
       {/* ---------- MANUAL LOCATION UI ---------- */}
       {showManual && (
-        <div className="container mt-3">
+        <div className="container mt-5">
           <div className="alert alert-warning text-center">
-            <strong>We couldn’t get your precise location.</strong>
+            We couldn’t get your precise location.
             <br />
-            Please select your area to see nearby turfs.
+            Please select your area.
           </div>
 
           <div className="input-group mb-2">
             <input
               className="form-control"
-              placeholder="Search city or area"
+              placeholder="Search city / area"
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
             />
-            <button
-              className="btn btn-outline-primary"
-              onClick={searchLocation}
-            >
+            <button className="btn btn-outline-primary" onClick={searchLocation}>
               Search
             </button>
           </div>
 
           <button
-            className="btn btn-success w-100 mb-2"
+            className="btn btn-success w-100"
             disabled={!manualLocation}
             onClick={saveManualLocation}
           >
@@ -176,63 +216,57 @@ export default function MapHome() {
       )}
 
       {/* ---------- MAP ---------- */}
-      <div className="container-fluid p-0">
-        <MapContainer
-          center={manualLocation || location}
-          zoom={14}
-          style={{ height: "100vh", width: "100%" }}
-        >
-          <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+      <MapContainer
+        center={location}
+        zoom={mapZoom}
+        style={{ height: "100vh", width: "100%" }}
+      >
+        <MapController center={manualLocation || location} zoom={mapZoom} />
 
-          {/* MANUAL PIN */}
-          {showManual && (
-            <>
-              <LocationPicker setManualLocation={setManualLocation} />
-              {manualLocation && <Marker position={manualLocation} />}
-            </>
-          )}
+        <TileLayer
+          attribution="&copy; OpenStreetMap contributors"
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
-          {/* TURFS */}
-          {!showManual &&
-            turfs.map(turf => (
-              <Marker
-                key={turf._id}
-                position={[
-                  turf.location.coordinates[1],
-                  turf.location.coordinates[0]
-                ]}
-              >
-                <Popup>
-                  <div className="text-center" style={{ width: "200px" }}>
-                    <img
-                      src={turf.image || DEFAULT_IMAGE}
-                      alt={turf.name}
-                      className="img-fluid rounded mb-2 mx-auto d-block"
-                      style={{ height: "100px", objectFit: "cover" }}
-                      onError={e => (e.target.src = DEFAULT_IMAGE)}
-                    />
+        {showManual && (
+          <>
+            <LocationPicker setManualLocation={setManualLocation} />
+            {manualLocation && <Marker position={manualLocation} />}
+          </>
+        )}
 
-                    <h6 className="fw-bold mb-1">{turf.name}</h6>
-
-                    <p className="text-muted mb-2">
-                      ₹{turf.pricePerHour}/hour
-                    </p>
-
-                    <button
-                      className="btn btn-primary btn-sm w-100"
-                      onClick={() => navigate(`/book/${turf._id}`)}
-                    >
-                      Book Now
-                    </button>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-        </MapContainer>
-      </div>
+        {!showManual &&
+          turfs.map(turf => (
+            <Marker
+              key={turf._id}
+              position={[
+                turf.location.coordinates[1],
+                turf.location.coordinates[0]
+              ]}
+            >
+              <Popup>
+                <div className="text-center" style={{ width: "200px" }}>
+                  <img
+                    src={turf.image || DEFAULT_IMAGE}
+                    className="img-fluid rounded mb-2"
+                    style={{ height: "100px", objectFit: "cover" }}
+                    alt={turf.name}
+                  />
+                  <h6 className="fw-bold">{turf.name}</h6>
+                  <p className="text-muted mb-2">
+                    ₹{turf.pricePerHour}/hour
+                  </p>
+                  <button
+                    className="btn btn-primary btn-sm w-100"
+                    onClick={() => navigate(`/book/${turf._id}`)}
+                  >
+                    Book Now
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+      </MapContainer>
     </>
   );
 }
