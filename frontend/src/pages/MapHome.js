@@ -119,7 +119,7 @@ export default function MapHome() {
     await loadNearbyTurfs(manualLocation[0], manualLocation[1]);
   };
 
-  /* ---------- CHANGE LOCATION ---------- */
+  /* ---------- CHANGE LOCATION ------------ */
   const changeLocation = () => {
     sessionStorage.removeItem("user_location");
     setShowManual(true);
