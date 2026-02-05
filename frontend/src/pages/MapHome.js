@@ -185,7 +185,7 @@ export default function MapHome() {
         </button>
       </div>
 
-      {/* ---------- MANUAL LOCATION UI ---------- */}
+      {/* ---------- MANUAL LOCATION UI ------------- */}
       {showManual && (
         <div
           className="position-absolute top-0 start-0 w-100 p-3"
